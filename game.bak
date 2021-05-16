@@ -297,7 +297,7 @@
                   (do-verb)]    ; volte a processar outro comando, loop
                  [else (do-verb)])))) ; caso contrário, outro comando, loop
           (begin ; comando incorreto
-            (printf "I don't understand what you mean.\n")
+            (printf "I don't undertand what you mean.\n")
             (do-verb)))))
 
 
