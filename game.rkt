@@ -103,7 +103,7 @@
 
 
 ;; Added by Manoel Mendonca 25/03/2021
-;; ame result as before, but much safer
+;; Same result as before, but much safer
 (define all-verbs (filter verb? (hash-keys elements)))
 
 
@@ -184,6 +184,84 @@
 ;; Places ----------------------------------------
 ;; Each place handles a set of non-transitive verbs.
 
+(define estacionamento
+  (place
+   "Você está no estacionamento."
+   (list)
+   (list
+    (cons north 
+          (lambda () paf-1))
+    (cons east 
+          (lambda () estacao-buzufba)))))
+(record-element! 'estacionamento estacionamento)
+
+(define estacao-buzufba
+  (place
+   "Você está na estação do Buzufba."
+   (list)
+   (list
+    (cons west 
+          (lambda () estacionamento))
+    (cons north 
+          (lambda () paf-1)))))
+(record-element! 'estacao-buzufba estacao-buzufba)
+
+(define restaurante-universitario
+  (place
+   "Você está no Restaurante Universitário."
+   (list)
+   (list
+    (cons east 
+          (lambda () paf-1)))))
+(record-element! 'restaurante-universitario restaurante-universitario)
+
+(define paf-1
+  (place
+   "Você está no PAF 1."
+   (list)
+   (list
+    (cons west 
+          (lambda () restaurante-universitario))
+    (cons north 
+          (lambda () faculdade-farmacia))
+    (cons west 
+          (lambda () biblioteca-central)))))
+(record-element! 'paf-1 paf-1)
+
+(define faculdade-farmacia
+  (place
+   "Você está na Faculdade de Farmácia."
+   (list)
+   (list
+    (cons south 
+          (lambda () paf-1)))))
+(record-element! 'faculdade-farmacia faculdade-farmacia)
+
+(define faculdade-medicina
+  (place
+   "Você está na Faculdade de Medicina."
+   (list)
+   (list)))
+(record-element! 'faculdade-medicina faculdade-medicina)
+
+(define biblioteca-central
+  (place
+   "Você está na Biblioteca Central."
+   (list)
+   (list
+    (cons east 
+          (lambda () paf-1)))))
+(record-element! 'biblioteca-central biblioteca-central)
+
+(define politecnica
+  (place
+   "Você está na Politécnica."
+   (list)
+   (list)))
+(record-element! 'politecnica politecnica)
+
+;; -------------------------------------------------------------------
+
 (define meadow
   (place
    "You're standing in a meadow. There is a house to the north."
@@ -233,7 +311,7 @@
 (define stuff null) ; list of things
 
 ;; Current location:
-(define current-place meadow) ; place
+(define current-place estacionamento) ; place
 
 ;; Fuctions to be used by verb responses:
 (define (have-thing? t)
