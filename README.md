@@ -18,13 +18,14 @@
 * Após vacinado e utilizando máscara, você poderá entrar no PAF 1 para ter suas aulas
 
 ## Places
+* estacionamento
 * paf-1
 * faculdade-farmacia
 * faculdade-medicina
 * biblioteca-central
 * restaurante-universitario
 * politecnica
-* buzufba
+* estacao-buzufba
 
 ## Things
 * vacina-covid-19
