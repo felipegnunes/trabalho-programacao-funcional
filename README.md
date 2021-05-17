@@ -17,6 +17,10 @@
 * No entanto, consertar o Buzufba pode causar fome, e provavelmente você terá que ir no RU
 * Após vacinado e utilizando máscara, você poderá entrar no PAF 1 para ter suas aulas
 
+## Mapa do Jogo
+
+![alt text](./mapa.jpeg "Mapa do jogo")
+
 ## Places
 * estacionamento
 * morrinho
