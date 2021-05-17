@@ -19,13 +19,14 @@
 
 ## Places
 * estacionamento
+* morrinho
+* estacao-buzufba
+* restaurante-universitario
 * paf-1
 * faculdade-farmacia
 * faculdade-medicina
 * biblioteca-central
-* restaurante-universitario
 * politecnica
-* estacao-buzufba
 
 ## Things
 * vacina-covid-19

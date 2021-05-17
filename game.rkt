@@ -190,10 +190,24 @@
    (list)
    (list
     (cons north 
-          (lambda () paf-1))
+          (lambda () morrinho))
     (cons east 
           (lambda () estacao-buzufba)))))
 (record-element! 'estacionamento estacionamento)
+
+(define morrinho
+  (place
+   "Você está no morrinho."
+   (list)
+   (list
+    (cons north 
+          (lambda () biblioteca-central))
+    (cons west 
+          (lambda () restaurante-universitario))
+    (cons east 
+          (lambda () paf-1))
+    (cons south 
+          (lambda () estacionamento)))))
 
 (define estacao-buzufba
   (place
@@ -201,18 +215,16 @@
    (list)
    (list
     (cons west 
-          (lambda () estacionamento))
-    (cons north 
-          (lambda () paf-1)))))
+          (lambda () estacionamento)))))
 (record-element! 'estacao-buzufba estacao-buzufba)
 
 (define restaurante-universitario
   (place
-   "Você está no Restaurante Universitário."
+   "Você está no restaurante universitário."
    (list)
    (list
     (cons east 
-          (lambda () paf-1)))))
+          (lambda () morrinho)))))
 (record-element! 'restaurante-universitario restaurante-universitario)
 
 (define paf-1
@@ -221,11 +233,9 @@
    (list)
    (list
     (cons west 
-          (lambda () restaurante-universitario))
+          (lambda () morrinho))
     (cons north 
-          (lambda () faculdade-farmacia))
-    (cons west 
-          (lambda () biblioteca-central)))))
+          (lambda () faculdade-farmacia)))))
 (record-element! 'paf-1 paf-1)
 
 (define faculdade-farmacia
@@ -233,8 +243,12 @@
    "Você está na Faculdade de Farmácia."
    (list)
    (list
+    (cons west 
+          (lambda () biblioteca-central))
     (cons south 
-          (lambda () paf-1)))))
+          (lambda () paf-1))
+    (cons north 
+          (lambda () politecnica)))))
 (record-element! 'faculdade-farmacia faculdade-farmacia)
 
 (define faculdade-medicina
@@ -250,14 +264,18 @@
    (list)
    (list
     (cons east 
-          (lambda () paf-1)))))
+          (lambda () faculdade-farmacia))
+    (cons south 
+          (lambda () morrinho)))))
 (record-element! 'biblioteca-central biblioteca-central)
 
 (define politecnica
   (place
    "Você está na Politécnica."
    (list)
-   (list)))
+   (list
+    (cons south 
+          (lambda () faculdade-farmacia)))))
 (record-element! 'politecnica politecnica)
 
 ;; -------------------------------------------------------------------
