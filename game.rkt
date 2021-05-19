@@ -59,7 +59,7 @@
 
 (define comer
   (verbo (list 'comer 'rangar)
-         "comendo"
+         "comer"
          #false))
 
 (define consertar
@@ -78,17 +78,17 @@
          #false))
 
 (define inventory
-  (verbo (list 'inventory)
-         "check inventory"
+  (verbo (list 'inventario 'inventory)
+         "checar inventário"
          #false))
 
-(define help
-  (verbo (list 'help)
+(define ajuda
+  (verbo (list 'ajuda 'help)
          (symbol->string 'help)
          #false))
 
 (define all-verbs (list pegar olhar cima baixo direita esquerda
-                        entrar sair comer consertar estudar quit inventory help))
+                        entrar sair comer consertar estudar quit inventory ajuda))
 
 ; Ações Globais
 ; Ações que podem ser executadas em qualquer lugar
@@ -98,7 +98,7 @@
    (cons quit (lambda () (begin (printf "Saindo...\n") (exit))))
    (cons olhar (lambda () (show-current-place)))
    (cons inventory (lambda () (show-inventory)))
-   (cons help (lambda () (show-help)))))
+   (cons ajuda (lambda () (show-help)))))
 
 ;; Coisas
 
@@ -153,9 +153,11 @@
                 (lambda ()
                   (if (have-thing? vacina)
                       "Você já foi vacinado."
-                      (begin
-                        (take-thing! vacina)
-                        "Você foi vacinado e recebeu um comprovante de vacinação.")))))))
+                      (if (eq? fome #t)
+                          "Você precisa estar de barriga cheia para receber a vacina."
+                          (begin
+                            (take-thing! vacina)
+                            "Você foi vacinado e recebeu um comprovante de vacinação."))))))))
 
 (define onibus
   (coisa 'onibus
@@ -168,8 +170,9 @@
                           (if (eq? (coisa-estado onibus) #f)
                               (begin
                                 (set-coisa-estado! onibus 'consertado)
-                                "Usando a ferramenta e seu conhecimento de engenharia mecânica, você consertou o ônibus.\n
-                            O ônibus agora está funcionando.")
+                                (printf "Usando a ferramenta e seu conhecimento de engenharia mecânica, você consertou o ônibus.\nO ônibus agora está funcionando.\n")
+                                (set! fome #t)
+                                "Você ficou com fome.")
                               "O ônibus já foi consertado.")
                           "Você não tem o conhecimento necessário para consertar o ônibus.")
                       "Você precisa de uma ferramenta para consertar o ônibus.")))
@@ -181,7 +184,7 @@
                             (printf "Você entrou no ônibus.\nIndo para o Canela...\n")
                             faculdade-medicina)
                           (begin
-                            (printf "Você entrou no ônibus.\nindo para Ondina...\n")
+                            (printf "Você entrou no ônibus.\nIndo para Ondina...\n")
                             estacao-buzufba))
                       "O ônibus está quebrado.")))
           (cons pegar
@@ -189,10 +192,10 @@
                   (if (eq? (coisa-estado onibus) 'consertado)
                       (if (eq? current-place estacao-buzufba)
                           (begin
-                            (printf "Você entrou no ônibus, indo para o Canela.\n")
+                            (printf "Você entrou no ônibus\nIndo para o Canela...\n")
                             faculdade-medicina)
                           (begin
-                            (printf "Você entrou no ônibus, indo para Ondina.\n")
+                            (printf "Você entrou no ônibus.\nIndo para Ondina...\n")
                             estacao-buzufba))
                       "O ônibus está quebrado."))))))
 
@@ -233,9 +236,16 @@
 
 (define restaurante-universitario
   (lugar
-   "Você está no restaurante universitário."
+   "Você está no restaurante universitário.\nÉ possível comer aqui."
    (list)
    (list
+    (cons comer
+          (lambda ()
+            (if (eq? fome #t)
+                (begin
+                  (set! fome #f)
+                  (printf "Você comeu e está de barriga cheia.\n"))
+                "Você não está com fome.")))
     (cons direita
           (lambda () morrinho)))))
 
@@ -300,13 +310,15 @@
     (cons baixo
           (lambda () faculdade-farmacia)))))
 
-; Estado do Jogo
 
 ; Inventário
 (define inventario (list))
 
 ; Local Inicial
 (define current-place estacionamento)
+
+; Fome
+(define fome #f)
 
 ; Funções Gerais
 (define (have-thing? thing) ; checa se item está no inventário
@@ -333,7 +345,10 @@
   (printf "\n"))
 
 (define (show-help)
-  (printf "Escreva `inventory' para ver seus itens.\n"))
+  (printf "Escreva `olhar' para examinar o local atual.\n")
+  (printf "Escreva `inventario' para ver seus itens.\n")
+  (printf "Escreva `quit' para sair do jogo.\n")
+  )
 
 (define (do-place)
   (show-current-place) ; mostra lugar atual
