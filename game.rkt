@@ -1,351 +1,262 @@
 #lang racket
 
-;; ============================================================
-;; Model:
+; Structs
+(struct verbo (sinonimos          ; lista de symbols
+               desc               ; string
+               complemento?)      ; bool
+  #:transparent)
 
-;; Elements of the world:
-(struct verb (aliases       ; list of symbols
-              desc          ; string
-              transitive?)) ; boolean
+(struct lugar (desc               ; string
+               [things #:mutable] ; lista de coisas
+               actions))          ; lista de pares verbo-coisa
 
-(struct thing (name         ; symbol
-               [state #:mutable] ; any value
-               actions))    ; list of verb--thing pairs
+(struct coisa (nome               ; symbol
+               [estado #:mutable] ; valor qualquer
+               acoes))            ; lista de pares verbo-coisa
 
-(struct place (desc         ; string
-               [things #:mutable] ; list of things
-               actions))    ; list of verb--thing pairs
+; macros
 
-;; Tables mapping names<->things for save and load
-(define names (make-hash))
-(define elements (make-hash))
+(define-syntax-rule (define-verbos nomes
+                      [id spec ...] ...)
+  (begin
+    (define-verbo id spec ...) ...
+    (define nomes (list id ...))))
 
-(define (record-element! name val)
-  (hash-set! names name val)
-  (hash-set! elements val name))
+(define-syntax define-verbo
+  (syntax-rules (= _)
+    [(define-verbo id (= alias ...) desc)
+     (define id (verbo (list 'id 'alias ...) desc #f))]
+    [(define-verbo id _ (= alias ...) desc)
+     (define id (verbo (list 'id 'alias ...) desc #t))]
+    [(define-verbo id)
+     (define id (verbo (list 'id) (symbol->string 'id) #f))]
+    [(define-verbo id _)
+     (define id (verbo (list 'id) (symbol->string 'id) #t))]))
 
-(define (name->element name) (hash-ref names name #f))
-(define (element->name obj) (hash-ref elements obj #f))
+(define-syntax-rule (define-coisa nome 
+                      [verb expr] ...)
+    (define nome 
+      (coisa 'nome #f (list (cons verb (lambda () expr)) ...))))
 
-;; ============================================================
-;; The world:
+(define-syntax-rule (define-lugar nome 
+                      desc 
+                      (coisa ...) 
+                      ([verbo expr] ...))
+    (define nome (lugar desc
+                      (list coisa ...)
+                      (list (cons verbo (lambda () expr)) ...))))
 
-;; Verbs ----------------------------------------
-;; Declare all the verbs that can be used in the game.
-;; Each verb has a canonical name, a set of aliases, 
-;; a printed form, and a boolean indincating whether it
-;; is transitive.
+(define-syntax-rule (define-global nome ([verbo expr] ...))
+  (define nome (list (cons verbo (lambda () expr)) ...)))
 
-(define north (verb (list 'north 'n) "go north" #f))
-(record-element! 'north north)
+; Verbos
 
-(define south (verb (list 'south 's) "go south" #f))
-(record-element! 'south south)
+(define-verbos all-verbs
+  [pegar _ (= coletar adquirir tomar) "pegar"]
+  [olhar (= examinar observar ver analisar) "examinar"]
+  [cima (= N norte) "ir para cima"]
+  [baixo (= S sul) "ir para baixo"]
+  [direita (= L leste) "ir para direita"]
+  [esquerda (= O oeste) "ir para esquerda"]
+  [entrar _ (=) "entrar"]
+  [sair (= retirar leave) "sair"]
+  [comer (= rangar) "comer"]
+  [consertar _ (= reparar) "reparar"]
+  [estudar (= ler) "ler"]
+  [quit (= exit sair) "quit"]
+  [inventory (= invantario) "checar inventário"]
+  [ajuda (= help) "help"])
 
-(define east (verb (list 'east 'e) "go east" #f))
-(record-element! 'east east)
+(define-global acoes-globais
+  ([quit (begin (printf "Saindo...\n") (exit))]
+   [olhar (show-current-place)]
+   [inventory (show-inventory)]
+   [ajuda (show-help)]))
 
-(define west (verb (list 'west 'w) "go west" #f))
-(record-element! 'west west)
+;; Coisas
 
-(define up (verb (list 'up) "go up" #f))
-(record-element! 'up up)
-
-(define down (verb (list 'down) "go down" #f))
-(record-element! 'down down)
-
-(define in (verb (list 'in 'enter) "enter" #f))
-(record-element! 'in in)
-
-(define out (verb (list 'out 'leave) "leave" #f))
-(record-element! 'out out)
-
-(define get (verb (list 'get 'grab 'take) "take" #t))
-(record-element! 'get get)
-
-(define put (verb (list 'put 'drop 'leave) "drop" #t))
-(record-element! 'put put)
-
-(define open (verb (list 'open 'unlock) "open" #t))
-(record-element! 'open open)
-
-(define close (verb (list 'close 'lock) "close" #t))
-(record-element! 'close close)
-
-(define knock (verb (list 'knock) (symbol->string 'knock) #t))
-(record-element! 'knock knock)
-
-(define quit (verb (list 'quit 'exit) "quit" #f))
-(record-element! 'quit quit)
-
-(define look (verb (list 'look 'show) "look" #f))
-(record-element! 'look look)
-
-(define inventory (verb (list 'inventory) "check inventory" #f))
-(record-element! 'inventory inventory)
-
-(define help (verb (list 'help) (symbol->string 'help) #f))
-(record-element! 'help help)
-
-(define save (verb (list 'save) (symbol->string 'save) #f))
-(record-element! 'save save)
-
-(define load (verb (list 'load) (symbol->string 'load) #f))
-(record-element! 'load load)
-
-#|
-;; Removed by Manoel Mendonca
-(define all-verbs
-  (list north south east west up down in out
-        get put open close knock quit
-        look inventory help save load))
-|#
-
-
-;; Added by Manoel Mendonca 25/03/2021
-;; Same result as before, but much safer
-(define all-verbs (filter verb? (hash-keys elements)))
-
-
-;; Global actions ----------------------------------------
-;; Handle verbs that work anywhere.
-
-(define everywhere-actions
-  (list
-   (cons quit (lambda () (begin (printf "Bye!\n") (exit))))
-   (cons look (lambda () (show-current-place)))
-   (cons inventory (lambda () (show-inventory)))
-   (cons save (lambda () (save-game)))
-   (cons load (lambda () (load-game)))
-   (cons help (lambda () (show-help)))))
-
-;; Things ----------------------------------------
-;; Each thing handles a set of transitive verbs.
-
-
-(define cactus
-  (thing 'cactus 
-         #f 
-         (list (cons get (lambda () "Ouch!")))))
-(record-element! 'cactus cactus)
-
-(define door
-  (thing 'door
-         #f
-         (list
-          (cons open 
-                (lambda ()
-                  (if (have-thing? key)
+(define-coisa ferramenta
+  [pegar (if (have-thing? ferramenta)
+                      "Você já pegou a ferramenta."
                       (begin
-                        (set-thing-state! door 'open)
-                        "The door is now unlocked and open.")
-                      "The door is locked.")))
-          (cons close 
-                (lambda ()
-                  (begin
-                    (set-thing-state! door #f)
-                    "The door is now closed.")))
-          (cons knock 
-                (lambda ()
-                  "No one is home.")))))
-(record-element! 'door door)
+                        (take-thing! ferramenta)
+                        "Você pegou a ferramenta. Agora, você pode consertar o Buzufba."))])
 
-(define key
-  (thing 'key
-         #f
-         (list
-          (cons get 
-                (lambda ()
-                  (if (have-thing? key)
-                      "You already have the key."
+(define-coisa livro
+  [pegar (if (have-thing? livro)
+                      "Você já pegou o livro."
                       (begin
-                        (take-thing! key)
-                        "You now have the key."))))
-          (cons put 
-                (lambda ()
-                  (if (have-thing? key)
+                        (take-thing! livro)
+                        "Você pegou o livro."))]
+  [estudar (if (eq? (coisa-estado livro) #f)
                       (begin
-                        (drop-thing! key)
-                        "You have dropped the key.")
-                      "You don't have the key."))))))
-(record-element! 'key key)
+                        (set-coisa-estado! livro 'lido)
+                        "Você aprendeu a consertar o ônibus, mas precisará de uma ferramenta.")
+                      "Você já leu o livro e adquiriu os conhecimentos para consertar o ônibus utilizando uma ferramenta.")])
 
-(define trophy
-  (thing 'trophy
-         #f
-         (list
-          (cons get 
-                (lambda ()
-                  (begin
-                    (take-thing! trophy)
-                    "You win!"))))))
-(record-element! 'trophy trophy)
+(define-coisa mascara
+  [pegar (if (have-thing? mascara)
+                      "Você já está de máscara."
+                      (begin
+                        (take-thing! mascara)
+                        "Você agora está de máscara."))])
 
-;; Places ----------------------------------------
-;; Each place handles a set of non-transitive verbs.
+(define-coisa vacina
+  [pegar (if (have-thing? vacina)
+                      "Você já foi vacinado."
+                      (if (eq? fome #t)
+                          "Você precisa estar de barriga cheia para receber a vacina."
+                          (begin
+                            (take-thing! vacina)
+                            "Você foi vacinado e recebeu um comprovante de vacinação.")))])
 
-(define estacionamento
-  (place
-   "Você está no estacionamento."
-   (list)
-   (list
-    (cons north 
-          (lambda () paf-1))
-    (cons east 
-          (lambda () estacao-buzufba)))))
-(record-element! 'estacionamento estacionamento)
-
-(define estacao-buzufba
-  (place
-   "Você está na estação do Buzufba."
-   (list)
-   (list
-    (cons west 
-          (lambda () estacionamento))
-    (cons north 
-          (lambda () paf-1)))))
-(record-element! 'estacao-buzufba estacao-buzufba)
-
-(define restaurante-universitario
-  (place
-   "Você está no Restaurante Universitário."
-   (list)
-   (list
-    (cons east 
-          (lambda () paf-1)))))
-(record-element! 'restaurante-universitario restaurante-universitario)
-
-(define paf-1
-  (place
-   "Você está no PAF 1."
-   (list)
-   (list
-    (cons west 
-          (lambda () restaurante-universitario))
-    (cons north 
-          (lambda () faculdade-farmacia))
-    (cons west 
-          (lambda () biblioteca-central)))))
-(record-element! 'paf-1 paf-1)
-
-(define faculdade-farmacia
-  (place
-   "Você está na Faculdade de Farmácia."
-   (list)
-   (list
-    (cons south 
-          (lambda () paf-1)))))
-(record-element! 'faculdade-farmacia faculdade-farmacia)
-
-(define faculdade-medicina
-  (place
-   "Você está na Faculdade de Medicina."
-   (list)
-   (list)))
-(record-element! 'faculdade-medicina faculdade-medicina)
-
-(define biblioteca-central
-  (place
-   "Você está na Biblioteca Central."
-   (list)
-   (list
-    (cons east 
-          (lambda () paf-1)))))
-(record-element! 'biblioteca-central biblioteca-central)
-
-(define politecnica
-  (place
-   "Você está na Politécnica."
-   (list)
-   (list)))
-(record-element! 'politecnica politecnica)
-
-;; -------------------------------------------------------------------
-
-(define meadow
-  (place
-   "You're standing in a meadow. There is a house to the north."
-   (list)
-   (list
-    (cons north 
-          (lambda () house-front))
-    (cons south 
-          (lambda () desert)))))
-(record-element! 'meadow meadow)
-
-(define house-front
-  (place
-   "You are standing in front of a house."
-   (list door)
-   (list
-    (cons in 
-          (lambda ()
-            (if (eq? (thing-state door) 'open)
-                room
-                "The door is not open.")))
-    (cons south (lambda () meadow)))))
-(record-element! 'house-front house-front)
-
-(define desert
-  (place
-   "You're in a desert. There is nothing for miles around."
-   (list cactus key)
-   (list
-    (cons north (lambda () meadow))
-    (cons south (lambda () desert))
-    (cons east (lambda () desert))
-    (cons west (lambda () desert)))))
-(record-element! 'desert desert)
-
-(define room
-  (place
-   "You're in the house."
-   (list trophy)
-   (list (cons out (lambda () house-front)))))
-(record-element! 'room room)
-
-;; ============================================================
-;; Game state
-
-;; Things carried by the player:
-(define stuff null) ; list of things
-
-;; Current location:
-(define current-place estacionamento) ; place
-
-;; Fuctions to be used by verb responses:
-(define (have-thing? t)
-  (memq t stuff))
-
-(define (take-thing! t) 
-  (set-place-things! current-place
-                     (remq t (place-things current-place)))
-  (set! stuff (cons t stuff)))
-
-(define (drop-thing! t) 
-  (set-place-things! current-place
-                     (cons t (place-things current-place)))
-  (set! stuff (remq t stuff)))
+(define-coisa onibus
+  [consertar (if (have-thing? ferramenta)
+                      (if (eq? (coisa-estado livro) 'lido)
+                          (if (eq? (coisa-estado onibus) #f)
+                              (begin
+                                (set-coisa-estado! onibus 'consertado)
+                                (printf "Usando a ferramenta e seu conhecimento de engenharia mecânica, você consertou o ônibus.\nO ônibus agora está funcionando.\n")
+                                (set! fome #t)
+                                "Você ficou com fome.")
+                              "O ônibus já foi consertado.")
+                          "Você não tem o conhecimento necessário para consertar o ônibus.")
+                      "Você precisa de uma ferramenta para consertar o ônibus.")]
+  [entrar (if (eq? (coisa-estado onibus) 'consertado)
+                      (if (eq? current-place estacao-buzufba)
+                          (begin
+                            (printf "Você entrou no ônibus.\nIndo para o Canela...\n")
+                            faculdade-medicina)
+                          (begin
+                            (printf "Você entrou no ônibus.\nIndo para Ondina...\n")
+                            estacao-buzufba))
+                      "O ônibus está quebrado.")]
+  [pegar (if (eq? (coisa-estado onibus) 'consertado)
+                      (if (eq? current-place estacao-buzufba)
+                          (begin
+                            (printf "Você entrou no ônibus\nIndo para o Canela...\n")
+                            faculdade-medicina)
+                          (begin
+                            (printf "Você entrou no ônibus.\nIndo para Ondina...\n")
+                            estacao-buzufba))
+                      "O ônibus está quebrado.")])
 
 
-;; ============================================================
-;; Game execution
+; Lugares
 
-;; Inicializes and begin
-;; Show the player the current place, then get a command:
+(define-lugar estacionamento
+  "Você está no estacionamento"
+  []
+  ([cima morrinho]
+  [direita estacao-buzufba]))
+
+(define-lugar morrinho
+  "Você está no morrinho."
+  []
+  ([cima biblioteca-central]
+   [esquerda restaurante-universitario]
+   [direita paf-1]
+   [baixo estacionamento]))
+
+(define-lugar estacao-buzufba
+  "Você está na estação do Buzufba."
+  [onibus]
+  ([esquerda estacionamento]))
+
+(define-lugar restaurante-universitario
+  "Você está no restaurante universitário.\nÉ possível comer aqui."
+  []
+  ([comer (if (eq? fome #t)
+                (begin
+                  (set! fome #f)
+                  (printf "Você comeu e está de barriga cheia.\n"))
+                "Você não está com fome.")]
+   [direita morrinho]))
+
+(define-lugar paf-1
+  "Você está na frente do PAF 1."
+  []
+  ([entrar (if (have-thing? mascara)
+                (if (have-thing? vacina)
+                    sala-de-aula
+                    "Você precisa estar vacinado para entrar.")
+                "Você não pode entrar sem máscara.")]
+   [esquerda morrinho]
+   [cima faculdade-farmacia]))
+
+(define-lugar sala-de-aula
+  "Você está assistindo a aula. Fim de jogo."
+  []
+  ([sair paf-1]))
+
+(define-lugar faculdade-farmacia
+  "Você está na Faculdade de Farmácia."
+  [mascara]
+  ([esquerda biblioteca-central]
+  [baixo paf-1]
+  [cima politecnica]))
+
+(define-lugar faculdade-medicina
+  "Você está na Faculdade de Medicina."
+  [vacina onibus]
+  ())
+
+(define-lugar biblioteca-central
+  "Você está na Biblioteca Central."
+  [livro]
+  ([direita faculdade-farmacia]
+   [baixo morrinho]))
+
+(define-lugar politecnica
+  "Você está na Politécnica."
+  [ferramenta]
+  ([baixo faculdade-farmacia]))
+
+; Inventário
+(define inventario (list))
+
+; Local Inicial
+(define current-place estacionamento)
+
+; Fome
+(define fome #f)
+
+; Funções Gerais
+(define (have-thing? thing) ; checa se item está no inventário
+  (memq thing inventario))
+
+(define (take-thing! thing) ; pega item do lugar e coloca no inventário
+  (set-lugar-things! current-place
+                     (remq thing (lugar-things current-place)))
+  (set! inventario (cons thing inventario)))
+
+(define (show-current-place)
+  (printf "~a\n" (lugar-desc current-place)) ; imprime o lugar
+  (for-each (lambda (thing)      ; imprime as coisas do lugar
+              (printf "Tem um ~a aqui.\n" (coisa-nome thing)))
+            (lugar-things current-place)))
+
+(define (show-inventory)
+  (printf "Seu inventário: ")
+  (if (null? inventario)
+      (printf "Você não tem itens.")
+      (for-each (lambda (coisa)
+                  (printf "\n  ~a" (coisa-nome coisa)))
+                inventario))
+  (printf "\n"))
+
+(define (show-help)
+  (printf "Escreva `olhar' para examinar o local atual.\n")
+  (printf "Escreva `inventario' para ver seus itens.\n")
+  (printf "Escreva `quit' para sair do jogo.\n")
+  )
+
 (define (do-place)
   (show-current-place) ; mostra lugar atual
   (do-verb))           ; executa comando
 
-;; Show the current place:
-(define (show-current-place)
-  (printf "~a\n" (place-desc current-place)) ; imprime o lugar
-  (for-each (lambda (thing)      ; imprime as coisas do lugar
-              (printf "There is a ~a here.\n" (thing-name thing)))
-            (place-things current-place)))
-
 ;; Main loop
-;; Get and handle a command:
+;; Get and handle a command
 (define (do-verb)
   (printf "> ")             ; imprime o prompt
   (flush-output)
@@ -356,27 +267,26 @@
                       (for/list ([v (in-port read port)]) v)))])  ; em "input"
     (if (and (list? input)            ; se input é lista,
              (andmap symbol? input)   ; tem só símbolos,
-             (<= 1 (length input) 2)) ; e tem um ou dois símbolos, é um comando correto
+             (<= 1 (length input) 2)) ; checa se 1 <= (número de símbolos) <= 2
         (let ([cmd (car input)]) ;; o comando principal, verbo, é o começo da lista
-            (let ([response ;; monta resposta para verbos
-                   (cond
-                    [(= 2 (length input))
-                     (handle-transitive-verb cmd (cadr input))] ;; transitivos
-                    [(= 1 (length input))
-                     (handle-intransitive-verb cmd)])])         ;; intransitivos
-              (let ([result (response)]) ;; resposta é uma função, execute-a
-                (cond
-                 [(place? result) ;; se o resultado for um lugar
-                  (set! current-place result) ;; ele passa a ser o novo lugar
-                  (do-place)]   ;; faça o processamento do novo lugar, loop
-                 [(string? result) ; se a resposta for uma string
-                  (printf "~a\n" result)  ; imprima a resposta
-                  (do-verb)]    ; volte a processar outro comando, loop
-                 [else (do-verb)])))) ; caso contrário, outro comando, loop
-          (begin ; comando incorreto
-            (printf "I don't undertand what you mean.\n")
-            (do-verb)))))
-
+          (let ([response ;; monta resposta para verbos
+                 (cond
+                   [(= 2 (length input))
+                    (handle-transitive-verb cmd (cadr input))] ;; transitivos
+                   [(= 1 (length input))
+                    (handle-intransitive-verb cmd)])])         ;; intransitivos
+            (let ([result (response)]) ;; resposta é uma função, execute-a
+              (cond
+                [(lugar? result) ;; se o resultado for um lugar
+                 (set! current-place result) ;; ele passa a ser o novo lugar
+                 (do-place)]   ;; faça o processamento do novo lugar, loop
+                [(string? result) ; se a resposta for uma string
+                 (printf "~a\n" result)  ; imprima a resposta
+                 (do-verb)]    ; volte a processar outro comando, loop
+                [else (do-verb)])))) ; caso contrário, outro comando, loop
+        (begin ; Comando incorreto
+          (printf "Não entendi.\n")
+          (do-verb)))))
 
 ;; Handle an intransitive-verb command:
 ;; retorna função para processar verbo intrasitivo
@@ -384,20 +294,20 @@
 (define (handle-intransitive-verb cmd)
   (or
    ; considerando o lugar, retorna a ação associada ao verbo
-   (find-verb cmd (place-actions current-place))
+   (find-verb cmd (lugar-actions current-place))
    ; se não achou no lugar, considerando o jogo todo, retorna a ação associada ao verbo
-   (find-verb cmd everywhere-actions)
+   (find-verb cmd acoes-globais)
    ; se não achou no lugar ou no geral, mas o verbo existe
    ; retorna uma função que dá uma mensagem de erro em contexto
    (using-verb  ; procura o verbo, obtem info descritiva, e retorna a função abaixo
     cmd all-verbs
     (lambda (verb)
       (lambda () ; função retornada por using-verb, mensagem de erro em contexto
-        (if (verb-transitive? verb)
-            (format "~a what?" (string-titlecase (verb-desc verb)))
-            (format "Can't ~a here." (verb-desc verb))))))
+        (if (verbo-complemento? verb)
+            (format "~a o quê?" (string-titlecase (verbo-desc verb)))
+            (format "Você não consegue ~a." (verbo-desc verb))))))
    (lambda () ; não achou o verbo no jogo
-     (format "I don't know how to ~a." cmd))))
+     (format "Você não sabe ~a." cmd))))
 
 ;; Handle a transitive-verb command:
 (define (handle-transitive-verb cmd obj)
@@ -405,41 +315,31 @@
        cmd all-verbs
        (lambda (verb) ; função retornada
          (and ; retorna falso se alguma destas coisas for falsa
-          (verb-transitive? verb) ; verbo é transitivo? - funcão criada por struct 
+          (verbo-complemento? verb) ; verbo é transitivo? - funcão criada por struct 
           (cond
-           [(ormap (lambda (thing) ; verifica se o objeto nomeado existe em contexto
-                     (and (eq? (thing-name thing) obj)
-                          thing))
-                   ; na lista das coisas do lugar e das coisas que tenho (stuff)
-                   (append (place-things current-place) 
-                           stuff))
-            => (lambda (thing) ; se existe, aplica esta função sobre a coisa/thing
-                 (or (find-verb cmd (thing-actions thing)) ; retorna acão que se aplica a coisa
-                     (lambda () ; se ação não encontrada, indica que não há ação
-                       (format "Don't know how to ~a ~a."
-                               (verb-desc verb) obj))))]
-           [else ; se objeto não existe
-            (lambda ()
-              (format "There's no ~a here to ~a." obj 
-                      (verb-desc verb)))]))))
+            [(ormap (lambda (thing) ; verifica se o objeto nomeado existe em contexto
+                      (and (eq? (coisa-nome thing) obj)
+                           thing))
+                    ; na lista das coisas do lugar e das coisas que tenho (stuff)
+                    (append (lugar-things current-place) 
+                            inventario))
+             => (lambda (thing) ; se existe, aplica esta função sobre a coisa/thing
+                  (or (find-verb cmd (coisa-acoes thing)) ; retorna acão que se aplica a coisa
+                      (lambda () ; se ação não encontrada, indica que não há ação
+                        (format "Você não sabe ~a ~a."
+                                (verbo-desc verb) obj))))]
+            [else ; se objeto não existe
+             (lambda ()
+               (format "Aqui não tem ~a para ~a." obj 
+                       (verbo-desc verb)))]))))
       (lambda ()  ; se não achou o verbo
-        (format "I don't know how to ~a ~a." cmd obj))))
-
-;; Show what the player is carrying:
-(define (show-inventory)
-  (printf "You have")
-  (if (null? stuff)
-      (printf " no items.")
-      (for-each (lambda (thing) ; aplica esta função a cada coisa da lista
-                  (printf "\n  a ~a" (thing-name thing)))
-                stuff))
-  (printf "\n"))
+        (format "Impossível ~a ~a." cmd obj))))
 
 ;; Look for a command match in a list of verb--response pairs,
 ;; and returns the response thunk if a match is found:
 (define (find-verb cmd actions)
   (ormap (lambda (a)
-           (and (memq cmd (verb-aliases (car a)))
+           (and (memq cmd (verbo-sinonimos (car a)))
                 (cdr a)))
          actions))
 
@@ -447,68 +347,12 @@
 ;; applies `success-k' to the verb if one is found:
 (define (using-verb cmd verbs success-k)
   (ormap (lambda (vrb)
-           (and (memq cmd (verb-aliases vrb))
+           (and (memq cmd (verbo-sinonimos vrb))
                 (success-k vrb)))
          verbs))
 
-;; Print help information:
-(define (show-help)
-  (printf "Use `look' to look around.\n")
-  (printf "Use `inventory' to see what you have.\n")
-  (printf "Use `save' or `load' to save or restore your game.\n")
-  (printf "There are some other verbs, and you can name a thing after some verbs.\n"))
-
-;; ============================================================
-;; Save and load
-
-;; Prompt the user for a filename and apply `proc' to it,
-;; catching errors to report a reasonably nice message:
-(define (with-filename proc)
-  (printf "File name: ")
-  (flush-output)
-  (let ([v (read-line)])
-    (unless (eof-object? v)
-      (with-handlers ([exn? (lambda (exn)
-                              (printf "~a\n" (exn-message exn)))])
-        (unless (path-string? v)
-          (raise-user-error "bad filename"))
-        (proc v)))))
-
-;; Save the current game state:
-(define (save-game)
-  (with-filename
-   (lambda (v)
-     (with-output-to-file v
-       (lambda ()
-         (write
-          (list
-           (map element->name stuff)
-           (element->name current-place)
-           (hash-map names
-                     (lambda (k v)
-                       (cons k
-                             (cond
-                              [(place? v) (map element->name (place-things v))]
-                              [(thing? v) (thing-state v)]
-                              [else #f])))))))))))
-
-;; Restore a game state:
-(define (load-game)
-  (with-filename
-   (lambda (v)
-     (let ([v (with-input-from-file v read)])
-       (set! stuff (map name->element (car v)))
-       (set! current-place (name->element (cadr v)))
-       (for-each
-        (lambda (p)
-          (let ([v (name->element (car p))]
-                [state (cdr p)])
-            (cond
-             [(place? v) (set-place-things! v (map name->element state))]
-             [(thing? v) (set-thing-state! v state)])))
-        (caddr v))))))
-
-;; ============================================================
-;; Go!
-
 (do-place)
+
+
+
+

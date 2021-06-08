@@ -1,6 +1,5 @@
 #lang racket
 ; placeholder begin
-(define get '())
 (define pegar '())
 (define consertar '())
 (define entrar '())
