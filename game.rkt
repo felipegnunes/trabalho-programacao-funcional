@@ -14,158 +14,104 @@
                [estado #:mutable] ; valor qualquer
                acoes))            ; lista de pares verbo-coisa
 
+; macros
+
+(define-syntax-rule (define-verbos nomes
+                      [id spec ...] ...)
+  (begin
+    (define-verbo id spec ...) ...
+    (define nomes (list id ...))))
+
+(define-syntax define-verbo
+  (syntax-rules (= _)
+    [(define-verbo id (= alias ...) desc)
+     (define id (verbo (list 'id 'alias ...) desc #f))]
+    [(define-verbo id _ (= alias ...) desc)
+     (define id (verbo (list 'id 'alias ...) desc #t))]
+    [(define-verbo id)
+     (define id (verbo (list 'id) (symbol->string 'id) #f))]
+    [(define-verbo id _)
+     (define id (verbo (list 'id) (symbol->string 'id) #t))]))
+
+(define-syntax-rule (define-coisa nome 
+                      [verb expr] ...)
+    (define nome 
+      (coisa 'nome #f (list (cons verb (lambda () expr)) ...))))
+
+(define-syntax-rule (define-lugar nome 
+                      desc 
+                      (coisa ...) 
+                      ([verbo expr] ...))
+    (define nome (lugar desc
+                      (list coisa ...)
+                      (list (cons verbo (lambda () expr)) ...))))
+
+(define-syntax-rule (define-global nome ([verbo expr] ...))
+  (define nome (list (cons verbo (lambda () expr)) ...)))
 
 ; Verbos
 
-(define pegar
-  (verbo (list 'pegar 'coletar 'adquirir 'tomar)
-         "pegar"
-         #true))
+(define-verbos all-verbs
+  [pegar _ (= coletar adquirir tomar) "pegar"]
+  [olhar (= examinar observar ver analisar) "examinar"]
+  [cima (= N norte) "ir para cima"]
+  [baixo (= S sul) "ir para baixo"]
+  [direita (= L leste) "ir para direita"]
+  [esquerda (= O oeste) "ir para esquerda"]
+  [entrar _ (=) "entrar"]
+  [sair (= retirar leave) "sair"]
+  [comer (= rangar) "comer"]
+  [consertar _ (= reparar) "reparar"]
+  [estudar (= ler) "ler"]
+  [quit (= exit sair) "quit"]
+  [inventory (= invantario) "checar inventário"]
+  [ajuda (= help) "help"])
 
-(define olhar
-  (verbo (list 'olhar 'examinar 'observar 'ver 'analisar)
-         "examinar"
-         #false))
-
-(define cima
-  (verbo (list 'cima 'N 'norte)
-         "ir para cima"
-         #false))
-
-(define baixo
-  (verbo (list 'baixo 'S 'sul)
-         "ir para baixo"
-         #false))
-
-(define direita
-  (verbo (list 'direita 'L 'leste)
-         "ir para direita"
-         #false))
-
-(define esquerda
-  (verbo (list 'esquerda 'O 'oeste)
-         "ir para esquerda"
-         #false))
-
-(define entrar
-  (verbo (list 'entrar)
-         "entrar"
-         #true))
-
-(define sair
-  (verbo (list 'sair 'retirar 'leave)
-         "sair"
-         #false))
-
-(define comer
-  (verbo (list 'comer 'rangar)
-         "comer"
-         #false))
-
-(define consertar
-  (verbo (list 'consertar 'reparar)
-         "reparar"
-         #true))
-
-(define estudar
-  (verbo (list 'ler 'estudar)
-         "ler"
-         #true))
-
-(define quit
-  (verbo (list 'quit 'exit)
-         "quit"
-         #false))
-
-(define inventory
-  (verbo (list 'inventario 'inventory)
-         "checar inventário"
-         #false))
-
-(define ajuda
-  (verbo (list 'ajuda 'help)
-         (symbol->string 'help)
-         #false))
-
-(define all-verbs (list pegar olhar cima baixo direita esquerda
-                        entrar sair comer consertar estudar quit inventory ajuda))
-
-; Ações Globais
-; Ações que podem ser executadas em qualquer lugar
-
-(define acoes-globais
-  (list
-   (cons quit (lambda () (begin (printf "Saindo...\n") (exit))))
-   (cons olhar (lambda () (show-current-place)))
-   (cons inventory (lambda () (show-inventory)))
-   (cons ajuda (lambda () (show-help)))))
+(define-global acoes-globais
+  ([quit (begin (printf "Saindo...\n") (exit))]
+   [olhar (show-current-place)]
+   [inventory (show-inventory)]
+   [ajuda (show-help)]))
 
 ;; Coisas
 
-(define ferramenta
-  (coisa 'ferramenta
-         #f
-         (list
-          (cons pegar
-                (lambda ()
-                  (if (have-thing? ferramenta)
+(define-coisa ferramenta
+  [pegar (if (have-thing? ferramenta)
                       "Você já pegou a ferramenta."
                       (begin
                         (take-thing! ferramenta)
-                        "Você pegou a ferramenta. Agora, você pode consertar o Buzufba.")))))))
+                        "Você pegou a ferramenta. Agora, você pode consertar o Buzufba."))])
 
-(define livro
-  (coisa 'livro
-         #f
-         (list
-          (cons pegar
-                (lambda ()
-                  (if (have-thing? livro)
+(define-coisa livro
+  [pegar (if (have-thing? livro)
                       "Você já pegou o livro."
                       (begin
                         (take-thing! livro)
-                        "Você pegou o livro."))))
-          (cons estudar
-                (lambda ()
-                  (if (eq? (coisa-estado livro) #f)
+                        "Você pegou o livro."))]
+  [estudar (if (eq? (coisa-estado livro) #f)
                       (begin
                         (set-coisa-estado! livro 'lido)
                         "Você aprendeu a consertar o ônibus, mas precisará de uma ferramenta.")
-                      "Você já leu o livro e adquiriu os conhecimentos para consertar o ônibus utilizando uma ferramenta."))))))
+                      "Você já leu o livro e adquiriu os conhecimentos para consertar o ônibus utilizando uma ferramenta.")])
 
-(define mascara
-  (coisa 'mascara
-         #f
-         (list
-          (cons pegar
-                (lambda ()
-                  (if (have-thing? mascara)
+(define-coisa mascara
+  [pegar (if (have-thing? mascara)
                       "Você já está de máscara."
                       (begin
                         (take-thing! mascara)
-                        "Você agora está de máscara.")))))))
+                        "Você agora está de máscara."))])
 
-(define vacina
-  (coisa 'vacina
-         #f
-         (list
-          (cons pegar
-                (lambda ()
-                  (if (have-thing? vacina)
+(define-coisa vacina
+  [pegar (if (have-thing? vacina)
                       "Você já foi vacinado."
                       (if (eq? fome #t)
                           "Você precisa estar de barriga cheia para receber a vacina."
                           (begin
                             (take-thing! vacina)
-                            "Você foi vacinado e recebeu um comprovante de vacinação."))))))))
+                            "Você foi vacinado e recebeu um comprovante de vacinação.")))])
 
-(define onibus
-  (coisa 'onibus
-         #f
-         (list
-          (cons consertar
-                (lambda ()
-                  (if (have-thing? ferramenta)
+(define-coisa onibus
+  [consertar (if (have-thing? ferramenta)
                       (if (eq? (coisa-estado livro) 'lido)
                           (if (eq? (coisa-estado onibus) #f)
                               (begin
@@ -175,10 +121,8 @@
                                 "Você ficou com fome.")
                               "O ônibus já foi consertado.")
                           "Você não tem o conhecimento necessário para consertar o ônibus.")
-                      "Você precisa de uma ferramenta para consertar o ônibus.")))
-          (cons entrar
-                (lambda ()
-                  (if (eq? (coisa-estado onibus) 'consertado)
+                      "Você precisa de uma ferramenta para consertar o ônibus.")]
+  [entrar (if (eq? (coisa-estado onibus) 'consertado)
                       (if (eq? current-place estacao-buzufba)
                           (begin
                             (printf "Você entrou no ônibus.\nIndo para o Canela...\n")
@@ -186,10 +130,8 @@
                           (begin
                             (printf "Você entrou no ônibus.\nIndo para Ondina...\n")
                             estacao-buzufba))
-                      "O ônibus está quebrado.")))
-          (cons pegar
-                (lambda ()
-                  (if (eq? (coisa-estado onibus) 'consertado)
+                      "O ônibus está quebrado.")]
+  [pegar (if (eq? (coisa-estado onibus) 'consertado)
                       (if (eq? current-place estacao-buzufba)
                           (begin
                             (printf "Você entrou no ônibus\nIndo para o Canela...\n")
@@ -197,119 +139,78 @@
                           (begin
                             (printf "Você entrou no ônibus.\nIndo para Ondina...\n")
                             estacao-buzufba))
-                      "O ônibus está quebrado."))))))
+                      "O ônibus está quebrado.")])
 
 
 ; Lugares
 
-(define estacionamento
-  (lugar
-   "Você está no estacionamento."
-   (list)
-   (list
-    (cons cima
-          (lambda () morrinho))
-    (cons direita
-          (lambda () estacao-buzufba)))))
+(define-lugar estacionamento
+  "Você está no estacionamento"
+  []
+  ([cima morrinho]
+  [direita estacao-buzufba]))
 
-(define morrinho
-  (lugar
-   "Você está no morrinho."
-   (list)
-   (list
-    (cons cima 
-          (lambda () biblioteca-central))
-    (cons esquerda
-          (lambda () restaurante-universitario))
-    (cons direita
-          (lambda () paf-1))
-    (cons baixo
-          (lambda () estacionamento)))))
+(define-lugar morrinho
+  "Você está no morrinho."
+  []
+  ([cima biblioteca-central]
+   [esquerda restaurante-universitario]
+   [direita paf-1]
+   [baixo estacionamento]))
 
-(define estacao-buzufba
-  (lugar
-   "Você está na estação do Buzufba."
-   (list onibus)
-   (list
-    (cons esquerda
-          (lambda () estacionamento)))))
+(define-lugar estacao-buzufba
+  "Você está na estação do Buzufba."
+  [onibus]
+  ([esquerda estacionamento]))
 
-(define restaurante-universitario
-  (lugar
-   "Você está no restaurante universitário.\nÉ possível comer aqui."
-   (list)
-   (list
-    (cons comer
-          (lambda ()
-            (if (eq? fome #t)
+(define-lugar restaurante-universitario
+  "Você está no restaurante universitário.\nÉ possível comer aqui."
+  []
+  ([comer (if (eq? fome #t)
                 (begin
                   (set! fome #f)
                   (printf "Você comeu e está de barriga cheia.\n"))
-                "Você não está com fome.")))
-    (cons direita
-          (lambda () morrinho)))))
+                "Você não está com fome.")]
+   [direita morrinho]))
 
-(define paf-1
-  (lugar
-   "Você está na frente do PAF 1."
-   (list)
-   (list
-    (cons entrar
-          (lambda ()
-            (if (have-thing? mascara)
+(define-lugar paf-1
+  "Você está na frente do PAF 1."
+  []
+  ([entrar (if (have-thing? mascara)
                 (if (have-thing? vacina)
                     sala-de-aula
                     "Você precisa estar vacinado para entrar.")
-                "Você não pode entrar sem máscara.")))
-    (cons esquerda
-          (lambda () morrinho))
-    (cons cima 
-          (lambda () faculdade-farmacia)))))
+                "Você não pode entrar sem máscara.")]
+   [esquerda morrinho]
+   [cima faculdade-farmacia]))
 
-(define sala-de-aula
-  (lugar
-   "Você está assistindo a aula. Fim de jogo."
-   (list)
-   (list
-    (cons sair
-          (lambda () paf-1)))))
+(define-lugar sala-de-aula
+  "Você está assistindo a aula. Fim de jogo."
+  []
+  ([sair paf-1]))
 
-(define faculdade-farmacia
-  (lugar
-   "Você está na Faculdade de Farmácia."
-   (list mascara)
-   (list
-    (cons esquerda
-          (lambda () biblioteca-central))
-    (cons baixo
-          (lambda () paf-1))
-    (cons cima 
-          (lambda () politecnica)))))
+(define-lugar faculdade-farmacia
+  "Você está na Faculdade de Farmácia."
+  [mascara]
+  ([esquerda biblioteca-central]
+  [baixo paf-1]
+  [cima politecnica]))
 
-(define faculdade-medicina
-  (lugar
-   "Você está na Faculdade de Medicina."
-   (list vacina onibus)
-   (list)))
+(define-lugar faculdade-medicina
+  "Você está na Faculdade de Medicina."
+  [vacina onibus]
+  ())
 
-(define biblioteca-central
-  (lugar
-   "Você está na Biblioteca Central."
-   (list livro)
-   (list
-    (cons direita 
-          (lambda () faculdade-farmacia))
-    (cons baixo
-          (lambda () morrinho)))))
+(define-lugar biblioteca-central
+  "Você está na Biblioteca Central."
+  [livro]
+  ([direita faculdade-farmacia]
+   [baixo morrinho]))
 
-(define politecnica
-  (lugar
-   "Você está na Politécnica."
-   (list ferramenta)
-   (list
-    (cons baixo
-          (lambda () faculdade-farmacia)))))
-
+(define-lugar politecnica
+  "Você está na Politécnica."
+  [ferramenta]
+  ([baixo faculdade-farmacia]))
 
 ; Inventário
 (define inventario (list))
