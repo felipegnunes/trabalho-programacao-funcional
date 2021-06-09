@@ -1,0 +1,14 @@
+#lang racket
+(define get '())
+(define (have-thing? thing) #t)
+
+(struct coisa (nome
+               [estado #:mutable]
+               acoes))
+
+(define ferramenta
+  (coisa 'ferramenta
+         #f
+         (list
+          (cons pega
+                (lambda () 
