@@ -208,7 +208,7 @@
                     (printf "Você entrou no ônibus. Indo para o Canela...\n")
                     faculdade-medicina)
                   (begin
-                    (printf "Você entrou no ônibus. Indo para Ondina...\n")
+                    (printf "Você entrou no ônibus. Indo para a Ondina...\n")
                     estacao-buzufba))
               "O ônibus está quebrado.")]
   [pegar (if (eq? (coisa-estado onibus) 'consertado)
@@ -257,7 +257,7 @@
    [baixo estacionamento]))
 
 (define-lugar estacao-buzufba
-  "Você está na estação do Buzufba.\nTem um ônibus aqui, com destino ao canela."
+  "Você está na estação do Buzufba.\nTem um ônibus aqui, com destino ao Canela."
   [onibus]
   ([esquerda estacionamento]
    [cima "Devido a uma obra, você não pode ir para o PAF 1 por esse caminho."]))
@@ -317,7 +317,7 @@
    [baixo faculdade-farmacia]))
 
 (define-lugar faculdade-medicina
-  "Você está na Faculdade de Medicina.\nTem um ônibus aqui, com destino à ondina.\nVocê pode se vacinar aqui!"
+  "Você está na Faculdade de Medicina.\nTem um ônibus aqui, com destino à Ondina.\nVocê pode se vacinar aqui!"
   [vacina onibus]
   ([vacinar (if (have-thing? vacina)
                 "Você já foi vacinado."
