@@ -3,11 +3,8 @@
 ; Tempo no começo do jogo
 (define game-start-timestamp (current-seconds))
 
-; Pontuação no começo do jogo
-(define pontuacao 10000)
-
-; Número de moedas coletadas até agora
-(define moedas 0)
+(define pontuacao 10000) ; Pontuação no começo do jogo
+(define moedas 0) ; Número de moedas coletadas até agora
 
 (define (fim-de-jogo pontuacao tempo-atual)
   (let ([end-string
@@ -35,7 +32,10 @@
                [estado #:mutable] ; valor qualquer
                acoes))            ; lista de pares verbo-coisa
 
-; macros
+; Macros
+
+(define-syntax-rule (state name initial-value)
+  (define name initial-value))
 
 (define-syntax-rule (define-verbos nomes
                       [id spec ...] ...)
@@ -58,14 +58,14 @@
                       genero
                       separate-display
                       [verb expr] ...)
-    (define nome 
-      (coisa 'nome genero separate-display #f (list (cons verb (lambda () expr)) ...))))
+  (define nome 
+    (coisa 'nome genero separate-display #f (list (cons verb (lambda () expr)) ...))))
 
 (define-syntax-rule (define-lugar nome 
                       desc 
                       (coisa ...) 
                       ([verbo expr] ...))
-    (define nome (lugar desc
+  (define nome (lugar desc
                       (list coisa ...)
                       (list (cons verbo (lambda () expr)) ...))))
 
@@ -93,7 +93,8 @@
   [vacinar (=) "vacinar"]
   [devolver _ (=) "devolver"]
   [balancar _ (= mexer) "balançar"]
-  [sentar _ (=) "sentar"])
+  [sentar _ (=) "sentar"]
+  [combater _ (= lutar) "combater"])
 
 (define-global acoes-globais
   ([quit (begin (printf "Saindo...\n") (exit))]
@@ -103,43 +104,50 @@
 
 ;; Coisas
 
+(define-coisa individuo 'm #t
+  [combater (begin
+           (set! individuo-suspeito-derrotado #t)
+           (set! pontuacao (+ pontuacao 10000))
+           "Você derrotou o indivíduo suspeito!")])           
+  
+
 (define-coisa ferramenta 'f #f
   [pegar (if (have-thing? ferramenta)
-                      "Você já tem uma ferramenta."
-                      (begin
-                        (take-thing! ferramenta)
-                        "Você pegou a ferramenta. Isso pode ser útil para consertar um ônibus."))])
+             "Você já tem uma ferramenta."
+             (begin
+               (take-thing! ferramenta)
+               "Você pegou a ferramenta. Isso pode ser útil para consertar um ônibus."))])
 
 (define-coisa livro 'm #t
   [pegar (if (or (eq? (coisa-estado livro) 'lido) (have-thing? livro))
-                      "Você já pegou um livro."
-                      (begin
-                        (take-thing! livro)
-                        "Você pegou um livro aleatoriamente. Por acaso, é um livro de engenharia mecânica."))]
+             "Você já pegou um livro."
+             (begin
+               (take-thing! livro)
+               "Você pegou um livro aleatoriamente. Por acaso, é um livro de engenharia mecânica."))]
   [estudar (if (eq? (coisa-estado livro) #f)
-                      (begin
-                        (set-coisa-estado! livro 'lido)
-                        "Você leu o livro e aprendeu a consertar um ônibus, desde que você tenha uma ferramenta.")
-                      "Você já leu o suficiente por hoje.")]
+               (begin
+                 (set-coisa-estado! livro 'lido)
+                 "Você leu o livro e aprendeu a consertar um ônibus, desde que você tenha uma ferramenta.")
+               "Você já leu o suficiente por hoje.")]
   [devolver (if (eq? (coisa-estado livro) 'lido)
                 (cond
-                 [(eq? current-place biblioteca-central)
-                  (take-thing! moeda-OG)
-                  (set! moedas (+ moedas 1))
-                  (set! inventario (remq livro inventario))
-                  (set! pontuacao (+ pontuacao 10000))
-                  (set-lugar-things! biblioteca-central (cons livro (lugar-things biblioteca-central)))
-                  "Você devolveu o livro para a biblioteca. Ao se preparar para sair, você percebe algo brilhando no chão. É uma moeda colecionável, com as letras \"OG\" na frente!\nVocê pega a moeda."]
-                 [else
-                  "Você precisa estar na biblioteca para devolver o livro."])
+                  [(eq? current-place biblioteca-central)
+                   (take-thing! moeda-OG)
+                   (set! moedas (+ moedas 1))
+                   (set! inventario (remq livro inventario))
+                   (set! pontuacao (+ pontuacao 10000))
+                   (set-lugar-things! biblioteca-central (cons livro (lugar-things biblioteca-central)))
+                   "Você devolveu o livro para a biblioteca. Ao se preparar para sair, você percebe algo brilhando no chão. É uma moeda colecionável, com as letras \"OG\" na frente!\nVocê pega a moeda."]
+                  [else
+                   "Você precisa estar na biblioteca para devolver o livro."])
                 "Seria melhor ler o livro antes de o devolver.")])                               
 
 (define-coisa mascara 'f #t
   [pegar (if (have-thing? mascara)
-                      "Você já está de máscara."
-                      (begin
-                        (take-thing! mascara)
-                        "Você agora está de máscara."))])
+             "Você já está de máscara."
+             (begin
+               (take-thing! mascara)
+               "Você agora está de máscara."))])
 
 (define-coisa moeda-PR 'f #t
   [pegar (begin
@@ -159,7 +167,7 @@
 (define-coisa banco 'm #f
   [sentar (cond
             [(have-thing? moeda-OL)
-              "Você sentou no banco. Legal."]
+             "Você sentou no banco. Legal."]
             [else
              (set! pontuacao (+ pontuacao 10000))
              (take-thing! moeda-OL)
@@ -168,43 +176,43 @@
 
 (define-coisa vacina 'f #t
   [pegar (if (have-thing? vacina)
-                      "Você já foi vacinado."
-                      (if (eq? fome #t)
-                          "Você precisa estar de barriga cheia para receber a vacina."
-                          (begin
-                            (take-thing! vacina)
-                            "Você foi vacinado e recebeu um comprovante de vacinação.")))])
+             "Você já foi vacinado."
+             (if (eq? fome #t)
+                 "Você precisa estar de barriga cheia para receber a vacina."
+                 (begin
+                   (take-thing! vacina)
+                   "Você foi vacinado e recebeu um comprovante de vacinação.")))])
 
 (define-coisa onibus 'none #t
   [consertar (if (have-thing? ferramenta)
-                      (if (eq? (coisa-estado livro) 'lido)
-                          (if (eq? (coisa-estado onibus) #f)
-                              (begin
-                                (set-coisa-estado! onibus 'consertado)
-                                (printf "Usando a ferramenta e seu conhecimento de engenharia mecânica, você consertou o ônibus.\n")
-                                (set! fome #t)
-                                "Você ficou com fome.")
-                              "O ônibus já foi consertado.")
-                          "Você não tem o conhecimento necessário para consertar o ônibus.")
-                      "Você precisa de uma ferramenta para consertar o ônibus.")]
+                 (if (eq? (coisa-estado livro) 'lido)
+                     (if (eq? (coisa-estado onibus) #f)
+                         (begin
+                           (set-coisa-estado! onibus 'consertado)
+                           (printf "Usando a ferramenta e seu conhecimento de engenharia mecânica, você consertou o ônibus.\n")
+                           (set! fome #t)
+                           "Você ficou com fome.")
+                         "O ônibus já foi consertado.")
+                     "Você não tem o conhecimento necessário para consertar o ônibus.")
+                 "Você precisa de uma ferramenta para consertar o ônibus.")]
   [entrar (if (eq? (coisa-estado onibus) 'consertado)
-                      (if (eq? current-place estacao-buzufba)
-                          (begin
-                            (printf "Você entrou no ônibus. Indo para o Canela...\n")
-                            faculdade-medicina)
-                          (begin
-                            (printf "Você entrou no ônibus. Indo para Ondina...\n")
-                            estacao-buzufba))
-                      "O ônibus está quebrado.")]
+              (if (eq? current-place estacao-buzufba)
+                  (begin
+                    (printf "Você entrou no ônibus. Indo para o Canela...\n")
+                    faculdade-medicina)
+                  (begin
+                    (printf "Você entrou no ônibus. Indo para Ondina...\n")
+                    estacao-buzufba))
+              "O ônibus está quebrado.")]
   [pegar (if (eq? (coisa-estado onibus) 'consertado)
-                      (if (eq? current-place estacao-buzufba)
-                          (begin
-                            (printf "Você entrou no ônibus. Indo para o Canela...\n")
-                            faculdade-medicina)
-                          (begin
-                            (printf "Você entrou no ônibus. Indo para a Ondina...\n")
-                            estacao-buzufba))
-                      "O ônibus está quebrado.")])
+             (if (eq? current-place estacao-buzufba)
+                 (begin
+                   (printf "Você entrou no ônibus. Indo para o Canela...\n")
+                   faculdade-medicina)
+                 (begin
+                   (printf "Você entrou no ônibus. Indo para a Ondina...\n")
+                   estacao-buzufba))
+             "O ônibus está quebrado.")])
 
 (define-coisa prova 'f #t
   [fazer sala-de-aula])
@@ -226,7 +234,7 @@
   "Você está no estacionamento."
   []
   ([cima morrinho]
-  [direita estacao-buzufba]))
+   [direita estacao-buzufba]))
 
 (define-lugar escola-de-danca
   "Você está na Escola de Dança."
@@ -251,10 +259,10 @@
   "Você está no restaurante universitário.\nÉ possível comer aqui."
   []
   ([comer (if (eq? fome #t)
-                (begin
-                  (set! fome #f)
-                  (printf "Você comeu e está de barriga cheia.\n"))
-                "Você não está com fome.")]
+              (begin
+                (set! fome #f)
+                (printf "Você comeu e está de barriga cheia.\n"))
+              "Você não está com fome.")]
    [direita morrinho]
    [esquerda escola-de-danca]))
 
@@ -262,18 +270,18 @@
   "Você está na frente do PAF 1."
   []
   ([entrar (if (have-thing? mascara)
-                (if (have-thing? vacina)
-                    paf-1-interior
-                    (if (eq? primeira-vez #t)
-                        (begin
-                          (set! primeira-vez #f)
-                          "Você tenta entrar no PAF 1, mas é barrado pelo segurança.\n\"Você precisa de uma máscara e de um comprovante de vacinação para entrar\", ele diz.")
-                        "Você precisa estar vacinado para entrar."))
-                (if (eq? primeira-vez #t)
-                    (begin
-                      (set! primeira-vez #f)
-                      "Você tenta entrar no PAF 1, mas é barrado pelo segurança.\n\"Você precisa de uma máscara e de um comprovante de vacinação para entrar\", ele diz.")
-                    "Você não pode entrar sem máscara."))]
+               (if (have-thing? vacina)
+                   paf-1-interior
+                   (if (eq? primeira-vez #t)
+                       (begin
+                         (set! primeira-vez #f)
+                         "Você tenta entrar no PAF 1, mas é barrado pelo segurança.\n\"Você precisa de uma máscara e de um comprovante de vacinação para entrar\", ele diz.")
+                       "Você precisa estar vacinado para entrar."))
+               (if (eq? primeira-vez #t)
+                   (begin
+                     (set! primeira-vez #f)
+                     "Você tenta entrar no PAF 1, mas é barrado pelo segurança.\n\"Você precisa de uma máscara e de um comprovante de vacinação para entrar\", ele diz.")
+                   "Você não pode entrar sem máscara."))]
    [esquerda morrinho]
    [cima faculdade-farmacia]
    [baixo "Devido a uma obra, você não pode ir para a estação do Buzufba por esse caminho."]))
@@ -292,19 +300,27 @@
   "Você está na Faculdade de Farmácia.\nTem uma cesta de máscaras na entrada, com um aviso dizendo \"máscaras grátis!\""
   [mascara]
   ([esquerda biblioteca-central]
-  [baixo paf-1]
-  [cima politecnica]))
+   [baixo paf-1]
+   [cima escadao-politecnica]))
+
+(define-lugar escadao-politecnica
+  "Você está no escadão da Politécnica.\nVocê avista um indivíduo suspeito no meio do escadão."
+  [individuo]
+  ([cima (if individuo-suspeito-derrotado
+             politecnica
+             "Você precisar combater o indivíduo suspeito para subir o escadão.")]
+   [baixo faculdade-farmacia]))
 
 (define-lugar faculdade-medicina
   "Você está na Faculdade de Medicina.\nTem um ônibus aqui, com destino à ondina.\nVocê pode se vacinar aqui!"
   [vacina onibus]
   ([vacinar (if (have-thing? vacina)
-                      "Você já foi vacinado."
-                      (if (eq? fome #t)
-                          "Você precisa estar de barriga cheia para receber a vacina."
-                          (begin
-                            (take-thing! vacina)
-                            "Você foi vacinado e recebeu um comprovante de vacinação.")))]))
+                "Você já foi vacinado."
+                (if (eq? fome #t)
+                    "Você precisa estar de barriga cheia para receber a vacina."
+                    (begin
+                      (take-thing! vacina)
+                      "Você foi vacinado e recebeu um comprovante de vacinação.")))]))
 
 (define-lugar biblioteca-central
   "Você está na Biblioteca Central.\nVocê pode pegar um livro aqui."
@@ -317,17 +333,12 @@
   [ferramenta]
   ([baixo faculdade-farmacia]))
 
-; Inventário
-(define inventario (list))
-
-; Local Inicial
-(define current-place estacionamento)
-
-; Fome
-(define fome #f)
-
-; Primeira vez tentando entrar no paf 1
-(define primeira-vez #t)
+; Estado do jogo
+(state inventario (list)) ; Inventário
+(state current-place estacionamento) ; Local Inicial
+(state fome #f) ; Fome
+(state primeira-vez #t) ; Primeira vez tentando entrar no paf 1
+(state individuo-suspeito-derrotado #f)
 
 ; Funções Gerais
 (define (have-thing? thing) ; checa se item está no inventário
@@ -344,8 +355,8 @@
               (if (coisa-separate-display coisa)
                   '()
                   (if (eq? (coisa-genero coisa) 'm)
-                     (printf "Tem um ~a aqui.\n" (coisa-nome coisa))
-                     (printf "Tem uma ~a aqui.\n" (coisa-nome coisa)))))
+                      (printf "Tem um ~a aqui.\n" (coisa-nome coisa))
+                      (printf "Tem uma ~a aqui.\n" (coisa-nome coisa)))))
             (lugar-things current-place)))
 
 (define (show-inventory)
@@ -472,6 +483,7 @@
            (and (memq cmd (verbo-sinonimos vrb))
                 (success-k vrb)))
          verbs))
+
 (define (final)
   (printf "> ")
   (flush-output)
