@@ -6,12 +6,19 @@
 ; Pontuação no começo do jogo
 (define pontuacao 10000)
 
+; Número de moedas coletadas até agora
+(define moedas 0)
+
 (define (fim-de-jogo pontuacao tempo-atual)
   (let ([total-elapsed-time (- tempo-atual game-start-timestamp)])
-             (format "Você entrou na sala de aula e fez a prova.\nFIM DE JOGO\nVocê terminou o jogo em ~amin~as.\nSua pontuação final foi ~a."
-                     (truncate (/ total-elapsed-time 60))
-                     (modulo total-elapsed-time 60)
-                     pontuacao)))
+             (printf (format "Você entrou na sala de aula e fez a prova.\nFIM DE JOGO\nVocê terminou o jogo em ~amin~as.\nSua pontuação final foi ~a.\n"
+                             (truncate (/ total-elapsed-time 60))
+                             (modulo total-elapsed-time 60)
+                             pontuacao)))
+  (printf (format "Você coletou ~a/3 moedas.\n"
+                  moedas))
+  (cond [(eq? moedas 3) (printf "Ao examinar as moedas, você percebeu que elas soletram \"PROLOG\". Legal!")]))
+  
 
 ; Structs
 (struct verbo (sinonimos          ; lista de symbols
@@ -84,7 +91,10 @@
   [inventory (= inventario) "checar inventário"]
   [ajuda (= help) "ajuda"]
   [fazer _ (=) "fazer"]
-  [vacinar (=) "vacinar"])
+  [vacinar (=) "vacinar"]
+  [devolver _ (=) "devolver"]
+  [balancar _ (= mexer) "balançar"]
+  [sentar _ (=) "sentar"])
 
 (define-global acoes-globais
   ([quit (begin (printf "Saindo...\n") (exit))]
@@ -102,7 +112,7 @@
                         "Você pegou a ferramenta. Isso pode ser útil para consertar um ônibus."))])
 
 (define-coisa livro 'm #t
-  [pegar (if (have-thing? livro)
+  [pegar (if (or (eq? (coisa-estado livro) 'lido) (have-thing? livro))
                       "Você já pegou um livro."
                       (begin
                         (take-thing! livro)
@@ -111,7 +121,19 @@
                       (begin
                         (set-coisa-estado! livro 'lido)
                         "Você leu o livro e aprendeu a consertar um ônibus, desde que você tenha uma ferramenta.")
-                      "Você já leu o suficiente por hoje.")])
+                      "Você já leu o suficiente por hoje.")]
+  [devolver (if (eq? (coisa-estado livro) 'lido)
+                (cond
+                 [(eq? current-place biblioteca-central)
+                  (take-thing! moeda-OG)
+                  (set! moedas (+ moedas 1))
+                  (set! inventario (remq livro inventario))
+                  (set! pontuacao (+ pontuacao 10000))
+                  (set-lugar-things! biblioteca-central (cons livro (lugar-things biblioteca-central)))
+                  "Você devolveu o livro para a biblioteca. Ao se preparar para sair, você percebe algo brilhando no chão. É uma moeda colecionável, com as letras \"OG\" na frente!\nVocê pega a moeda."]
+                 [else
+                  "Você precisa estar na biblioteca para devolver o livro."])
+                "Seria melhor ler o livro antes de o devolver.")])                               
 
 (define-coisa mascara 'f #t
   [pegar (if (have-thing? mascara)
@@ -119,6 +141,31 @@
                       (begin
                         (take-thing! mascara)
                         "Você agora está de máscara."))])
+
+(define-coisa moeda-PR 'f #t
+  [pegar (begin
+           (take-thing! moeda-PR)
+           "Você pegou a moeda.")])
+
+(define-coisa moeda-OL 'f #t
+  [pegar (begin
+           (take-thing! moeda-OL)
+           "Você pegou a moeda.")])
+
+(define-coisa moeda-OG 'f #t
+  [pegar (begin
+           (take-thing! moeda-OG)
+           "Você pegou a moeda.")])
+
+(define-coisa banco 'm #f
+  [sentar (cond
+            [(have-thing? moeda-OL)
+              "Você sentou no banco. Legal."]
+            [else
+             (set! pontuacao (+ pontuacao 10000))
+             (take-thing! moeda-OL)
+             (set! moedas (+ moedas 1))
+             "Você sentou no banco por alguns segundos. Ao levantar, você percebe algo brilhante no chão. É uma moeda colecionável, com as letras \"OL\" na frente!\nVocê pega a moeda."])])              
 
 (define-coisa vacina 'f #t
   [pegar (if (have-thing? vacina)
@@ -163,18 +210,33 @@
 (define-coisa prova 'f #t
   [fazer sala-de-aula])
 
+(define-coisa arvore 'f #f
+  [balancar (cond
+              [(have-thing? moeda-PR)
+               "Você balança a árvore. Nada acontece."]
+              [else
+               (set! pontuacao (+ pontuacao 10000))
+               (take-thing! moeda-PR)
+               (set! moedas (+ moedas 1))
+               "Você balança a árvore e algo brilhante cai dela. É uma moeda colecionável, com as letras \"PR\" na frente!\nVocê pega a moeda."])]
+  [pegar "Você tenta pegar a árvore, mas ela não cabe na sua mochila."])               
 
 ; Lugares
 
 (define-lugar estacionamento
-  "Você está no estacionamento"
+  "Você está no estacionamento."
   []
   ([cima morrinho]
   [direita estacao-buzufba]))
 
+(define-lugar escola-de-danca
+  "Você está na Escola de Dança."
+  [banco]
+  ([direita restaurante-universitario]))
+
 (define-lugar morrinho
   "Você está no morrinho."
-  []
+  [arvore]
   ([cima biblioteca-central]
    [esquerda restaurante-universitario]
    [direita paf-1]
@@ -194,7 +256,8 @@
                   (set! fome #f)
                   (printf "Você comeu e está de barriga cheia.\n"))
                 "Você não está com fome.")]
-   [direita morrinho]))
+   [direita morrinho]
+   [esquerda escola-de-danca]))
 
 (define-lugar paf-1
   "Você está na frente do PAF 1."
@@ -336,7 +399,7 @@
                  (set! pontuacao (- pontuacao 100))
                  (set! current-place result) ;; ele passa a ser o novo lugar
                  (if (eq? result sala-de-aula)
-                     (printf (fim-de-jogo pontuacao (current-seconds)))
+                     (fim-de-jogo pontuacao (current-seconds))
                      (do-place))]   ;; faça o processamento do novo lugar, loop
                 [(string? result) ; se a resposta for uma string
                  (printf "~a\n" result)  ; imprima a resposta
