@@ -94,7 +94,7 @@
   [devolver _ (=) "devolver"]
   [balancar _ (= mexer) "balançar"]
   [sentar _ (=) "sentar"]
-  [combater _ (= lutar) "combater"])
+  [passar _ (=) "passar"])
 
 (define-global acoes-globais
   ([quit (begin (printf "Saindo...\n") (exit))]
@@ -105,10 +105,13 @@
 ;; Coisas
 
 (define-coisa individuo 'm #t
-  [combater (begin
-           (set! individuo-suspeito-derrotado #t)
-           (set! pontuacao (+ pontuacao 10000))
-           "Você derrotou o indivíduo suspeito!")])           
+  [passar (if (have-thing? mascara)
+              (begin
+                (printf "Você passou pelo indivíduo com a devida proteção.\n")
+                    politecnica)
+              (begin
+                (set! pontuacao (- pontuacao 3000))
+                "Você não consegue passar pelo indivíduo sem usar uma máscara."))])       
   
 
 (define-coisa ferramenta 'f #f
@@ -124,12 +127,15 @@
              (begin
                (take-thing! livro)
                "Você pegou um livro aleatoriamente. Por acaso, é um livro de engenharia mecânica."))]
-  [estudar (if (eq? (coisa-estado livro) #f)
+  [estudar (if (have-thing? livro)
+               (if (eq? (coisa-estado livro) #f)
                (begin
                  (set-coisa-estado! livro 'lido)
                  "Você leu o livro e aprendeu a consertar um ônibus, desde que você tenha uma ferramenta.")
-               "Você já leu o suficiente por hoje.")]
-  [devolver (if (eq? (coisa-estado livro) 'lido)
+               "Você já leu o suficiente por hoje.")
+               "Você não possui um livro para ler.")]
+  [devolver (if (have-thing? livro)
+                (if (eq? (coisa-estado livro) 'lido)
                 (cond
                   [(eq? current-place biblioteca-central)
                    (take-thing! moeda-OG)
@@ -140,7 +146,8 @@
                    "Você devolveu o livro para a biblioteca. Ao se preparar para sair, você percebe algo brilhando no chão. É uma moeda colecionável, com as letras \"OG\" na frente!\nVocê pega a moeda."]
                   [else
                    "Você precisa estar na biblioteca para devolver o livro."])
-                "Seria melhor ler o livro antes de o devolver.")])                               
+                "Seria melhor ler o livro antes de o devolver.")
+                "Você não possui um livro para devolver.")])                               
 
 (define-coisa mascara 'f #t
   [pegar (if (have-thing? mascara)
@@ -304,11 +311,9 @@
    [cima escadao-politecnica]))
 
 (define-lugar escadao-politecnica
-  "Você está no escadão da Politécnica.\nVocê avista um indivíduo suspeito no meio do escadão."
+  "Você está no escadão da Politécnica.\nVocê avista um individuo sem máscara no meio do escadão."
   [individuo]
-  ([cima (if individuo-suspeito-derrotado
-             politecnica
-             "Você precisar combater o indivíduo suspeito para subir o escadão.")]
+  ([cima "Você precisa passar pelo indivíduo para subir o escadão."]
    [baixo faculdade-farmacia]))
 
 (define-lugar faculdade-medicina
@@ -331,14 +336,13 @@
 (define-lugar politecnica
   "Você está na Politécnica."
   [ferramenta]
-  ([baixo faculdade-farmacia]))
+  ([baixo escadao-politecnica]))
 
 ; Estado do jogo
 (state inventario (list)) ; Inventário
 (state current-place estacionamento) ; Local Inicial
 (state fome #f) ; Fome
 (state primeira-vez #t) ; Primeira vez tentando entrar no paf 1
-(state individuo-suspeito-derrotado #f)
 
 ; Funções Gerais
 (define (have-thing? thing) ; checa se item está no inventário
