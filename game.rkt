@@ -3,11 +3,8 @@
 ; Tempo no começo do jogo
 (define game-start-timestamp (current-seconds))
 
-; Pontuação no começo do jogo
-(define pontuacao 10000)
-
-; Número de moedas coletadas até agora
-(define moedas 0)
+(define pontuacao 10000) ; Pontuação no começo do jogo
+(define moedas 0) ; Número de moedas coletadas até agora
 
 (define (fim-de-jogo pontuacao tempo-atual)
   (let ([end-string
@@ -342,7 +339,6 @@
 (state fome #f) ; Fome
 (state primeira-vez #t) ; Primeira vez tentando entrar no paf 1
 (state individuo-suspeito-derrotado #f)
-
 
 ; Funções Gerais
 (define (have-thing? thing) ; checa se item está no inventário
