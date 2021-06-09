@@ -10,15 +10,14 @@
 (define moedas 0)
 
 (define (fim-de-jogo pontuacao tempo-atual)
-  (let ([total-elapsed-time (- tempo-atual game-start-timestamp)])
-             (printf (format "Você entrou na sala de aula e fez a prova.\nFIM DE JOGO\nVocê terminou o jogo em ~amin~as.\nSua pontuação final foi ~a.\n"
-                             (truncate (/ total-elapsed-time 60))
-                             (modulo total-elapsed-time 60)
-                             pontuacao)))
-  (printf (format "Você coletou ~a/3 moedas.\n"
-                  moedas))
-  (cond [(eq? moedas 3) (printf "Ao examinar as moedas, você percebeu que elas soletram \"PROLOG\". Legal!")]))
-  
+  (let ([end-string
+         (let ([total-elapsed-time (- tempo-atual game-start-timestamp)])
+           (format "Você entrou na sala de aula e fez a prova.\nFIM DE JOGO\nVocê terminou o jogo em ~amin~as.\nSua pontuação final foi ~a.\n"
+                   (truncate (/ total-elapsed-time 60))
+                   (modulo total-elapsed-time 60)
+                   pontuacao))])
+    (string-append end-string (format "Você coletou ~a/3 moedas.\nDigite qualquer coisa para sair do jogo.\n"
+                                      moedas))))
 
 ; Structs
 (struct verbo (sinonimos          ; lista de symbols
@@ -399,7 +398,9 @@
                  (set! pontuacao (- pontuacao 100))
                  (set! current-place result) ;; ele passa a ser o novo lugar
                  (if (eq? result sala-de-aula)
-                     (fim-de-jogo pontuacao (current-seconds))
+                     (begin
+                       (printf (fim-de-jogo pontuacao (current-seconds)))
+                       (final))
                      (do-place))]   ;; faça o processamento do novo lugar, loop
                 [(string? result) ; se a resposta for uma string
                  (printf "~a\n" result)  ; imprima a resposta
@@ -471,10 +472,13 @@
            (and (memq cmd (verbo-sinonimos vrb))
                 (success-k vrb)))
          verbs))
-
+(define (final)
+  (printf "> ")
+  (flush-output)
+  (let ([line (read-line)])
+    (exit)))
+  
 (printf "Você está no carro de um amigo indo para a UFBA, onde você tem uma prova de Prolog para fazer no PAF 1. Você chega na portaria 1 e sai do carro enquanto seu amigo procura uma vaga.\n\n")
+
 (do-place)
-
-
-
 
